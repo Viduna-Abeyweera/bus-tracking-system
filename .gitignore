@@ -38,3 +38,6 @@ Thumbs.db
 
 ### Environment/Secrets ###
 *.env
+
+### AI IDE Plugins ###
+.ai/
