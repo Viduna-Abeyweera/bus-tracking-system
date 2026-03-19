@@ -42,4 +42,12 @@ public class BusLocationController {
         List<BusLocation> locations = service.getLocationsByBusId(busId);
         return ResponseEntity.ok(locations);
     }
+
+    // GET → Get only the latest location for each bus
+    // URL: GET http://localhost:8080/api/bus-locations/latest
+    @GetMapping("/latest")
+    public ResponseEntity<List<BusLocation>> getLatestLocations() {
+        List<BusLocation> locations = service.getLatestLocations();
+        return ResponseEntity.ok(locations);
+    }
 }

@@ -32,4 +32,9 @@ public class BusLocationService {
     public List<BusLocation> getLocationsByBusId(String busId) {
         return repository.findByBusId(busId);
     }
+
+    // Get only the latest location for each bus
+    public List<BusLocation> getLatestLocations() {
+        return repository.findLatestLocationForEachBus();
+    }
 }
