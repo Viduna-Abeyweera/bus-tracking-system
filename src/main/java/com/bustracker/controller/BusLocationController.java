@@ -1,53 +1,89 @@
 package com.bustracker.controller;
 
-import com.bustracker.entity.BusLocation;
+import com.bustracker.dto.request.BusLocationRequest;
+import com.bustracker.dto.response.BusLocationResponse;
 import com.bustracker.service.BusLocationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST controller for bus location operations.
+ *
+ * <p>This controller is intentionally <strong>thin</strong>: it handles
+ * HTTP concerns (request mapping, validation, status codes) and delegates
+ * all business logic to the {@link BusLocationService} interface.</p>
+ *
+ * <p>Key SOLID principles demonstrated:</p>
+ * <ul>
+ *   <li><strong>SRP</strong>: Only handles HTTP request/response mapping</li>
+ *   <li><strong>DIP</strong>: Depends on {@code BusLocationService} interface,
+ *       not the concrete implementation</li>
+ *   <li><strong>Encapsulation</strong>: Accepts request DTOs, returns response
+ *       DTOs — entities are never exposed to the API</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/bus-locations")
+@Tag(name = "Bus Locations", description = "Endpoints for managing real-time bus GPS locations")
 public class BusLocationController {
 
-    private final BusLocationService service;
+    private final BusLocationService busLocationService;
 
-    public BusLocationController(BusLocationService service) {
-        this.service = service;
+    /**
+     * Constructor injection with interface type — demonstrates DIP.
+     * Spring auto-wires the concrete implementation (BusLocationServiceImpl).
+     */
+    public BusLocationController(BusLocationService busLocationService) {
+        this.busLocationService = busLocationService;
     }
 
-    // POST → Save a new bus location
-    // URL: POST http://localhost:8080/api/bus-locations
+    /**
+     * Saves a new bus location update from a driver.
+     * Returns HTTP 201 (Created) on success.
+     */
     @PostMapping
-    public ResponseEntity<BusLocation> addLocation(
-            @RequestBody BusLocation location) {
-        BusLocation saved = service.saveLocation(location);
-        return ResponseEntity.ok(saved);
+    @Operation(summary = "Submit bus location", description = "Drivers call this endpoint to share their current GPS location")
+    public ResponseEntity<BusLocationResponse> addLocation(
+            @Valid @RequestBody BusLocationRequest request) {
+        BusLocationResponse saved = busLocationService.saveLocation(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-    // GET → Get all bus locations
-    // URL: GET http://localhost:8080/api/bus-locations
+    /**
+     * Retrieves all bus location records.
+     */
     @GetMapping
-    public ResponseEntity<List<BusLocation>> getAllLocations() {
-        List<BusLocation> locations = service.getAllLocations();
+    @Operation(summary = "Get all locations", description = "Retrieve the complete history of all bus locations")
+    public ResponseEntity<List<BusLocationResponse>> getAllLocations() {
+        List<BusLocationResponse> locations = busLocationService.getAllLocations();
         return ResponseEntity.ok(locations);
     }
 
-    // GET → Get locations for a specific bus
-    // URL: GET http://localhost:8080/api/bus-locations/BUS-001
+    /**
+     * Retrieves all location records for a specific bus.
+     */
     @GetMapping("/{busId}")
-    public ResponseEntity<List<BusLocation>> getLocationsByBusId(
+    @Operation(summary = "Get locations by bus ID", description = "Retrieve all location history for a specific bus")
+    public ResponseEntity<List<BusLocationResponse>> getLocationsByBusId(
             @PathVariable String busId) {
-        List<BusLocation> locations = service.getLocationsByBusId(busId);
+        List<BusLocationResponse> locations = busLocationService.getLocationsByBusId(busId);
         return ResponseEntity.ok(locations);
     }
 
-    // GET → Get only the latest location for each bus
-    // URL: GET http://localhost:8080/api/bus-locations/latest
+    /**
+     * Retrieves only the latest location for each active bus.
+     * This is the primary endpoint used by the passenger map view.
+     */
     @GetMapping("/latest")
-    public ResponseEntity<List<BusLocation>> getLatestLocations() {
-        List<BusLocation> locations = service.getLatestLocations();
+    @Operation(summary = "Get latest locations", description = "Get the most recent location for each active bus (used by passenger map)")
+    public ResponseEntity<List<BusLocationResponse>> getLatestLocations() {
+        List<BusLocationResponse> locations = busLocationService.getLatestLocations();
         return ResponseEntity.ok(locations);
     }
 }
