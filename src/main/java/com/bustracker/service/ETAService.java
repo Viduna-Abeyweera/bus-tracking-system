@@ -1,51 +1,52 @@
 package com.bustracker.service;
 
-import com.bustracker.entity.BusLocation;
-import com.bustracker.entity.BusStop;
-import org.springframework.stereotype.Service;
+import com.bustracker.dto.response.ETAResponse;
 
-@Service
-public class ETAService {
+import java.util.List;
 
-    // Average bus speed in km/h
-    private static final double AVERAGE_SPEED_KMH = 25.0;
-
-    // Earth's radius in kilometers
-    private static final double EARTH_RADIUS_KM = 6371.0;
-
-    /**
-     * Calculate distance between two GPS points using Haversine formula
-     * Returns distance in kilometers
-     */
-    public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-
-        // Convert degrees to radians
-        double lat1Rad = Math.toRadians(lat1);
-        double lat2Rad = Math.toRadians(lat2);
-        double deltaLat = Math.toRadians(lat2 - lat1);
-        double deltaLon = Math.toRadians(lon2 - lon1);
-
-        // Haversine formula
-        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
-                + Math.cos(lat1Rad) * Math.cos(lat2Rad)
-                * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return EARTH_RADIUS_KM * c;
-    }
+/**
+ * Service interface for Estimated Time of Arrival (ETA) calculations.
+ *
+ * <p>This interface demonstrates the <strong>Interface Segregation Principle
+ * (ISP)</strong>: ETA calculation is a separate concern from bus location
+ * tracking. Clients that only need ETA should not be forced to depend on
+ * location-management methods.</p>
+ *
+ * <p>It also supports the <strong>Open/Closed Principle (OCP)</strong>:
+ * new ETA calculation strategies (e.g., route-based, traffic-aware) can
+ * be provided as new implementations without modifying existing code.</p>
+ */
+public interface ETAService {
 
     /**
-     * Calculate ETA in minutes from a bus to a stop
+     * Calculates the straight-line distance between two GPS coordinates.
+     *
+     * @param lat1 latitude of point 1
+     * @param lon1 longitude of point 1
+     * @param lat2 latitude of point 2
+     * @param lon2 longitude of point 2
+     * @return distance in kilometers
      */
-    public double calculateETAMinutes(BusLocation bus, BusStop stop) {
-        double distanceKm = calculateDistance(
-                bus.getLatitude(), bus.getLongitude(),
-                stop.getLatitude(), stop.getLongitude()
-        );
+    double calculateDistance(double lat1, double lon1, double lat2, double lon2);
 
-        // time = distance / speed (in hours), then convert to minutes
-        double timeHours = distanceKm / AVERAGE_SPEED_KMH;
-        return timeHours * 60;
-    }
+    /**
+     * Calculates the estimated time of arrival in minutes for a bus
+     * to reach a specific bus stop.
+     *
+     * @param busLat  current latitude of the bus
+     * @param busLon  current longitude of the bus
+     * @param stopLat latitude of the bus stop
+     * @param stopLon longitude of the bus stop
+     * @return estimated time in minutes
+     */
+    double calculateETAMinutes(double busLat, double busLon,
+                                double stopLat, double stopLon);
+
+    /**
+     * Calculates ETA for all active buses to a specific bus stop.
+     *
+     * @param stopId the ID of the target bus stop
+     * @return list of ETA responses, sorted by nearest bus first
+     */
+    List<ETAResponse> calculateETAForStop(Long stopId);
 }

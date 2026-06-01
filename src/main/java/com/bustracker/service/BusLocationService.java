@@ -1,40 +1,52 @@
 package com.bustracker.service;
 
-import com.bustracker.entity.BusLocation;
-import com.bustracker.repository.BusLocationRepository;
-import org.springframework.stereotype.Service;
+import com.bustracker.dto.request.BusLocationRequest;
+import com.bustracker.dto.response.BusLocationResponse;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
-@Service
-public class BusLocationService {
+/**
+ * Service interface for bus location operations.
+ *
+ * <p>This interface is a key demonstration of the <strong>Dependency Inversion
+ * Principle (DIP)</strong>: controllers depend on this abstraction rather than
+ * a concrete service class. This means the implementation can be swapped
+ * (e.g., for testing with a mock or switching to a different data source)
+ * without changing any controller code.</p>
+ *
+ * <p>It also follows the <strong>Interface Segregation Principle (ISP)</strong>
+ * by exposing only bus-location-related methods. ETA calculations and
+ * cleanup operations have their own separate interfaces.</p>
+ */
+public interface BusLocationService {
 
-    private final BusLocationRepository repository;
+    /**
+     * Saves a new bus location update.
+     *
+     * @param request the validated location request DTO
+     * @return the saved location as a response DTO
+     */
+    BusLocationResponse saveLocation(BusLocationRequest request);
 
-    // Constructor Injection (Spring automatically provides the repository)
-    public BusLocationService(BusLocationRepository repository) {
-        this.repository = repository;
-    }
+    /**
+     * Retrieves all bus location records.
+     *
+     * @return list of all bus location response DTOs
+     */
+    List<BusLocationResponse> getAllLocations();
 
-    // Save a new bus location
-    public BusLocation saveLocation(BusLocation location) {
-        location.setTimestamp(LocalDateTime.now());
-        return repository.save(location);
-    }
+    /**
+     * Retrieves all location records for a specific bus.
+     *
+     * @param busId the unique identifier of the bus
+     * @return list of location response DTOs for the given bus
+     */
+    List<BusLocationResponse> getLocationsByBusId(String busId);
 
-    // Get all bus locations
-    public List<BusLocation> getAllLocations() {
-        return repository.findAll();
-    }
-
-    // Get locations for a specific bus
-    public List<BusLocation> getLocationsByBusId(String busId) {
-        return repository.findByBusId(busId);
-    }
-
-    // Get only the latest location for each bus
-    public List<BusLocation> getLatestLocations() {
-        return repository.findLatestLocationForEachBus();
-    }
+    /**
+     * Retrieves only the most recent location for each active bus.
+     *
+     * @return list of the latest location response DTOs (one per bus)
+     */
+    List<BusLocationResponse> getLatestLocations();
 }
