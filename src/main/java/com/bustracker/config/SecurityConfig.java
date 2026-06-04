@@ -84,6 +84,24 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/bus-stops/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/bus-stops/**").hasRole("ADMIN")
 
+                        // Routes: anyone authenticated can read, only ADMIN can write
+                        .requestMatchers(HttpMethod.GET, "/api/routes/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/routes/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/routes/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/routes/**").hasRole("ADMIN")
+
+                        // Buses: anyone authenticated can read, ADMIN can manage
+                        .requestMatchers(HttpMethod.GET, "/api/buses/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/buses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/buses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/buses/**").hasAnyRole("DRIVER", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/buses/**").hasRole("ADMIN")
+
+                        // Schedules: anyone authenticated can read, only ADMIN can write
+                        .requestMatchers(HttpMethod.GET, "/api/schedules/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/schedules/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/schedules/**").hasRole("ADMIN")
+
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )
