@@ -2,6 +2,7 @@ package com.bustracker.service.impl;
 
 import com.bustracker.dto.request.BusRequest;
 import com.bustracker.dto.response.BusResponse;
+import com.bustracker.dto.websocket.BusStatusMessage;
 import com.bustracker.entity.Bus;
 import com.bustracker.entity.Route;
 import com.bustracker.entity.User;
@@ -12,10 +13,12 @@ import com.bustracker.repository.BusRepository;
 import com.bustracker.repository.RouteRepository;
 import com.bustracker.repository.UserRepository;
 import com.bustracker.service.BusService;
+import com.bustracker.service.WebSocketBroadcastService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,12 +37,15 @@ public class BusServiceImpl implements BusService {
     private final BusRepository busRepository;
     private final RouteRepository routeRepository;
     private final UserRepository userRepository;
+    private final WebSocketBroadcastService broadcastService;
 
     public BusServiceImpl(BusRepository busRepository, RouteRepository routeRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          WebSocketBroadcastService broadcastService) {
         this.busRepository = busRepository;
         this.routeRepository = routeRepository;
         this.userRepository = userRepository;
+        this.broadcastService = broadcastService;
     }
 
     @Override
@@ -117,6 +123,8 @@ public class BusServiceImpl implements BusService {
         Bus bus = busRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Bus", "id", id));
 
+        String previousStatus = bus.getStatus().name();
+
         try {
             BusStatus newStatus = BusStatus.valueOf(status.toUpperCase());
             bus.setStatus(newStatus);
@@ -128,7 +136,31 @@ public class BusServiceImpl implements BusService {
         Bus updated = busRepository.save(bus);
         logger.info("Bus '{}' status changed to '{}'",
                 updated.getRegistrationNumber(), updated.getStatus());
+
+        // Broadcast status change via WebSocket
+        broadcastStatusChange(updated, previousStatus);
+
         return toResponse(updated);
+    }
+
+    /**
+     * Broadcasts a bus status change to all connected WebSocket clients.
+     */
+    private void broadcastStatusChange(Bus bus, String previousStatus) {
+        try {
+            BusStatusMessage message = new BusStatusMessage(
+                    bus.getId(),
+                    bus.getRegistrationNumber(),
+                    bus.getRoute() != null ? bus.getRoute().getId() : null,
+                    bus.getRoute() != null ? bus.getRoute().getRouteNumber() : null,
+                    previousStatus,
+                    bus.getStatus().name(),
+                    LocalDateTime.now().toString()
+            );
+            broadcastService.broadcastStatusChange(message);
+        } catch (Exception e) {
+            logger.warn("Failed to broadcast status change via WebSocket: {}", e.getMessage());
+        }
     }
 
     @Override

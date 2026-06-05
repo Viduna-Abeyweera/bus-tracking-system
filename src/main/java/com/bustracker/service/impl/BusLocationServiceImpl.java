@@ -2,10 +2,14 @@ package com.bustracker.service.impl;
 
 import com.bustracker.dto.request.BusLocationRequest;
 import com.bustracker.dto.response.BusLocationResponse;
+import com.bustracker.dto.websocket.LocationUpdateMessage;
+import com.bustracker.entity.Bus;
 import com.bustracker.entity.BusLocation;
 import com.bustracker.mapper.BusLocationMapper;
 import com.bustracker.repository.BusLocationRepository;
+import com.bustracker.repository.BusRepository;
 import com.bustracker.service.BusLocationService;
+import com.bustracker.service.WebSocketBroadcastService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -33,15 +37,19 @@ public class BusLocationServiceImpl implements BusLocationService {
     private static final Logger logger = LoggerFactory.getLogger(BusLocationServiceImpl.class);
 
     private final BusLocationRepository repository;
+    private final BusRepository busRepository;
+    private final WebSocketBroadcastService broadcastService;
 
     /**
-     * Constructor injection — Spring automatically provides the repository.
+     * Constructor injection — Spring automatically provides dependencies.
      * Preferred over field injection for testability and immutability.
-     *
-     * @param repository the bus location JPA repository
      */
-    public BusLocationServiceImpl(BusLocationRepository repository) {
+    public BusLocationServiceImpl(BusLocationRepository repository,
+                                  BusRepository busRepository,
+                                  WebSocketBroadcastService broadcastService) {
         this.repository = repository;
+        this.busRepository = busRepository;
+        this.broadcastService = broadcastService;
     }
 
     @Override
@@ -53,7 +61,39 @@ public class BusLocationServiceImpl implements BusLocationService {
         logger.info("Saved location for bus '{}' at ({}, {})",
                 saved.getBusId(), saved.getLatitude(), saved.getLongitude());
 
+        // Broadcast via WebSocket to all connected passengers
+        broadcastLocationViaWebSocket(saved);
+
         return BusLocationMapper.toResponse(saved);
+    }
+
+    /**
+     * Broadcasts a bus location update via WebSocket.
+     * Looks up bus metadata (registration, route) for the broadcast message.
+     */
+    private void broadcastLocationViaWebSocket(BusLocation location) {
+        try {
+            LocationUpdateMessage message = new LocationUpdateMessage();
+            message.setBusId(location.getBusId());
+            message.setLatitude(location.getLatitude());
+            message.setLongitude(location.getLongitude());
+            message.setTimestamp(location.getTimestamp().toString());
+
+            // Enrich with bus metadata if available
+            busRepository.findByRegistrationNumber(location.getBusId())
+                    .ifPresent(bus -> {
+                        message.setRegistrationNumber(bus.getRegistrationNumber());
+                        if (bus.getRoute() != null) {
+                            message.setRouteId(bus.getRoute().getId());
+                            message.setRouteNumber(bus.getRoute().getRouteNumber());
+                        }
+                    });
+
+            broadcastService.broadcastLocationUpdate(message);
+        } catch (Exception e) {
+            // Don't let WebSocket failures affect the REST response
+            logger.warn("Failed to broadcast location via WebSocket: {}", e.getMessage());
+        }
     }
 
     @Override

@@ -73,6 +73,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/error").permitAll()
+                        // WebSocket endpoint — auth is handled by WebSocketAuthInterceptor
+                        .requestMatchers("/ws/**").permitAll()
 
                         // Bus locations: anyone authenticated can read, only DRIVER/ADMIN can write
                         .requestMatchers(HttpMethod.GET, "/api/bus-locations/**").authenticated()
