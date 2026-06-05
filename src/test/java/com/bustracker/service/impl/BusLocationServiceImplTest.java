@@ -4,6 +4,8 @@ import com.bustracker.dto.request.BusLocationRequest;
 import com.bustracker.dto.response.BusLocationResponse;
 import com.bustracker.entity.BusLocation;
 import com.bustracker.repository.BusLocationRepository;
+import com.bustracker.repository.BusRepository;
+import com.bustracker.service.WebSocketBroadcastService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,12 @@ class BusLocationServiceImplTest {
 
     @Mock
     private BusLocationRepository repository;
+
+    @Mock
+    private BusRepository busRepository;
+
+    @Mock
+    private WebSocketBroadcastService broadcastService;
 
     @InjectMocks
     private BusLocationServiceImpl service;
