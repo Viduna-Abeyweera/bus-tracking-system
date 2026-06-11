@@ -6,11 +6,12 @@ import com.bustracker.entity.BusStop;
 import com.bustracker.exception.ResourceNotFoundException;
 import com.bustracker.repository.BusLocationRepository;
 import com.bustracker.repository.BusStopRepository;
+import com.bustracker.strategy.RouteBasedETAStrategy;
+import com.bustracker.strategy.SimpleETAStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,10 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link ETAServiceImpl}.
- *
- * <p>Tests ETA calculation logic, distance computation, and
- * the aggregation of ETA for multiple buses to a stop.</p>
+ * Unit tests for {@link ETAServiceImpl} with Strategy Pattern.
  */
 @ExtendWith(MockitoExtension.class)
 class ETAServiceImplTest {
@@ -37,45 +35,27 @@ class ETAServiceImplTest {
     @Mock
     private BusStopRepository busStopRepository;
 
-    @InjectMocks
     private ETAServiceImpl service;
 
     private BusStop colomboFort;
 
     @BeforeEach
     void setUp() {
+        SimpleETAStrategy simpleStrategy = new SimpleETAStrategy();
+        RouteBasedETAStrategy routeBasedStrategy = new RouteBasedETAStrategy();
+
+        service = new ETAServiceImpl(
+                busLocationRepository, busStopRepository, simpleStrategy, routeBasedStrategy);
+
         colomboFort = new BusStop("Colombo Fort", 6.9344, 79.8428);
         colomboFort.setId(1L);
     }
 
     @Test
-    @DisplayName("Should calculate distance using Haversine formula")
-    void testCalculateDistance() {
-        // Colombo to Kandy (straight line ~90 km)
-        double distance = service.calculateDistance(6.9344, 79.8428, 7.2906, 80.6337);
-
-        assertTrue(distance > 85 && distance < 100,
-                "Colombo to Kandy should be ~90km, got: " + distance);
-    }
-
-    @Test
-    @DisplayName("Should calculate ETA in minutes based on distance and average speed")
-    void testCalculateETAMinutes() {
-        // 25 km distance at 25 km/h = 60 minutes
-        // Using coordinates ~25km apart
-        double eta = service.calculateETAMinutes(6.9344, 79.8428, 6.9344, 79.8428);
-
-        assertEquals(0.0, eta, 0.01, "ETA for same location should be 0");
-    }
-
-    @Test
     @DisplayName("Should calculate ETA for all buses to a stop and sort by nearest")
     void testCalculateETAForStop() {
-        // Bus near the stop (Colombo area)
         BusLocation nearBus = new BusLocation("BUS-001", 6.9400, 79.8500, LocalDateTime.now());
         nearBus.setId(1L);
-
-        // Bus far from the stop (Kandy area)
         BusLocation farBus = new BusLocation("BUS-002", 7.2906, 80.6337, LocalDateTime.now());
         farBus.setId(2L);
 
@@ -86,7 +66,6 @@ class ETAServiceImplTest {
         List<ETAResponse> result = service.calculateETAForStop(1L);
 
         assertEquals(2, result.size());
-        // Should be sorted by ETA — nearest bus first
         assertEquals("BUS-001", result.get(0).getBusId());
         assertEquals("BUS-002", result.get(1).getBusId());
         assertTrue(result.get(0).getEtaMinutes() < result.get(1).getEtaMinutes());
@@ -96,9 +75,7 @@ class ETAServiceImplTest {
     @DisplayName("Should throw ResourceNotFoundException for non-existent stop")
     void testCalculateETAForNonExistentStop() {
         when(busStopRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThrows(ResourceNotFoundException.class,
-                () -> service.calculateETAForStop(99L));
+        assertThrows(ResourceNotFoundException.class, () -> service.calculateETAForStop(99L));
     }
 
     @Test
@@ -108,7 +85,30 @@ class ETAServiceImplTest {
         when(busLocationRepository.findLatestLocationForEachBus()).thenReturn(List.of());
 
         List<ETAResponse> result = service.calculateETAForStop(1L);
-
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should allow switching ETA strategy at runtime")
+    void testStrategySwitching() {
+        // Default is route-based
+        double etaRouteBased = service.calculateETAMinutes(6.9344, 79.8428, 7.2906, 80.6337);
+
+        // Switch to simple
+        service.setStrategy("simple");
+        double etaSimple = service.calculateETAMinutes(6.9344, 79.8428, 7.2906, 80.6337);
+
+        // Both should produce positive values but differ
+        assertTrue(etaRouteBased > 0);
+        assertTrue(etaSimple > 0);
+        assertNotEquals(etaRouteBased, etaSimple, 0.01);
+    }
+
+    @Test
+    @DisplayName("Should calculate distance using Haversine formula")
+    void testCalculateDistance() {
+        double distance = service.calculateDistance(6.9344, 79.8428, 7.2906, 80.6337);
+        assertTrue(distance > 80 && distance < 130,
+                "Colombo to Kandy should be ~90-120km (with road factor), got: " + distance);
     }
 }

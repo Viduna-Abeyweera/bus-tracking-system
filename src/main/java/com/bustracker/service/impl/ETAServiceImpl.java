@@ -7,6 +7,9 @@ import com.bustracker.exception.ResourceNotFoundException;
 import com.bustracker.repository.BusLocationRepository;
 import com.bustracker.repository.BusStopRepository;
 import com.bustracker.service.ETAService;
+import com.bustracker.strategy.ETACalculationStrategy;
+import com.bustracker.strategy.RouteBasedETAStrategy;
+import com.bustracker.strategy.SimpleETAStrategy;
 import com.bustracker.util.GeoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,19 +20,18 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Implementation of {@link ETAService} using straight-line distance
- * calculation via the Haversine formula.
+ * Implementation of {@link ETAService} using the <strong>Strategy Pattern</strong>.
  *
- * <p>This class demonstrates several design principles:</p>
+ * <p>This class was refactored from Phase 1 to use pluggable ETA strategies
+ * instead of hardcoded speed calculations. The strategy can be switched
+ * at runtime based on the context (e.g., route availability).</p>
+ *
+ * <p>Design patterns demonstrated:</p>
  * <ul>
- *   <li><strong>SRP</strong>: Only handles ETA calculation logic. The
- *       Haversine formula itself is delegated to {@link GeoUtils}.</li>
- *   <li><strong>OCP</strong>: A new implementation (e.g., route-based ETA)
- *       can be created by implementing {@code ETAService} without modifying
- *       this class. Spring's {@code @Primary} or {@code @Qualifier} can
- *       then select the desired strategy.</li>
- *   <li><strong>DIP</strong>: Controllers depend on the {@code ETAService}
- *       interface, not this concrete class.</li>
+ *   <li><strong>Strategy Pattern</strong>: Different ETA algorithms via
+ *       {@link ETACalculationStrategy} interface</li>
+ *   <li><strong>DIP</strong>: Depends on strategy interface, not concrete classes</li>
+ *   <li><strong>OCP</strong>: New strategies can be added without modifying this class</li>
  * </ul>
  */
 @Service
@@ -37,30 +39,49 @@ public class ETAServiceImpl implements ETAService {
 
     private static final Logger logger = LoggerFactory.getLogger(ETAServiceImpl.class);
 
-    /** Average bus speed assumption in km/h for ETA estimation. */
-    private static final double AVERAGE_SPEED_KMH = 25.0;
-
     private final BusLocationRepository busLocationRepository;
     private final BusStopRepository busStopRepository;
+    private final SimpleETAStrategy simpleStrategy;
+    private final RouteBasedETAStrategy routeBasedStrategy;
+
+    /** The currently active strategy — defaults to route-based */
+    private ETACalculationStrategy activeStrategy;
 
     public ETAServiceImpl(BusLocationRepository busLocationRepository,
-                          BusStopRepository busStopRepository) {
+                          BusStopRepository busStopRepository,
+                          SimpleETAStrategy simpleStrategy,
+                          RouteBasedETAStrategy routeBasedStrategy) {
         this.busLocationRepository = busLocationRepository;
         this.busStopRepository = busStopRepository;
+        this.simpleStrategy = simpleStrategy;
+        this.routeBasedStrategy = routeBasedStrategy;
+        this.activeStrategy = routeBasedStrategy; // Default strategy
+    }
+
+    /**
+     * Allows runtime switching of the ETA calculation strategy.
+     *
+     * @param strategyName "simple" or "route-based"
+     */
+    public void setStrategy(String strategyName) {
+        if ("simple".equalsIgnoreCase(strategyName)) {
+            this.activeStrategy = simpleStrategy;
+        } else {
+            this.activeStrategy = routeBasedStrategy;
+        }
+        logger.info("ETA strategy switched to: {}", activeStrategy.getStrategyName());
     }
 
     @Override
     public double calculateDistance(double lat1, double lon1,
                                     double lat2, double lon2) {
-        return GeoUtils.calculateDistance(lat1, lon1, lat2, lon2);
+        return activeStrategy.calculateDistance(lat1, lon1, lat2, lon2);
     }
 
     @Override
     public double calculateETAMinutes(double busLat, double busLon,
                                        double stopLat, double stopLon) {
-        double distanceKm = GeoUtils.calculateDistance(busLat, busLon, stopLat, stopLon);
-        double timeHours = distanceKm / AVERAGE_SPEED_KMH;
-        return timeHours * 60;
+        return activeStrategy.calculateETA(busLat, busLon, stopLat, stopLon);
     }
 
     @Override
@@ -72,16 +93,16 @@ public class ETAServiceImpl implements ETAService {
         // Get latest location for each active bus
         List<BusLocation> latestLocations = busLocationRepository.findLatestLocationForEachBus();
 
-        // Calculate ETA for each bus
+        // Calculate ETA for each bus using the active strategy
         List<ETAResponse> etaList = new ArrayList<>();
 
         for (BusLocation bus : latestLocations) {
-            double distance = GeoUtils.calculateDistance(
+            double distance = activeStrategy.calculateDistance(
                     bus.getLatitude(), bus.getLongitude(),
                     stop.getLatitude(), stop.getLongitude()
             );
 
-            double etaMinutes = calculateETAMinutes(
+            double etaMinutes = activeStrategy.calculateETA(
                     bus.getLatitude(), bus.getLongitude(),
                     stop.getLatitude(), stop.getLongitude()
             );
@@ -103,8 +124,8 @@ public class ETAServiceImpl implements ETAService {
         // Sort by ETA (nearest bus first)
         etaList.sort(Comparator.comparingInt(ETAResponse::getEtaMinutes));
 
-        logger.info("Calculated ETA for {} buses to stop '{}'",
-                etaList.size(), stop.getName());
+        logger.info("Calculated ETA for {} buses to stop '{}' using strategy '{}'",
+                etaList.size(), stop.getName(), activeStrategy.getStrategyName());
 
         return etaList;
     }
