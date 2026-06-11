@@ -76,31 +76,31 @@ public class SecurityConfig {
                         // WebSocket endpoint — auth is handled by WebSocketAuthInterceptor
                         .requestMatchers("/ws/**").permitAll()
 
-                        // Bus locations: anyone authenticated can read, only DRIVER/ADMIN can write
-                        .requestMatchers(HttpMethod.GET, "/api/bus-locations/**").authenticated()
+                        // Bus locations: public read, only DRIVER/ADMIN can write
+                        .requestMatchers(HttpMethod.GET, "/api/bus-locations/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/bus-locations").hasAnyRole("DRIVER", "ADMIN")
 
-                        // Bus stops: anyone authenticated can read, only ADMIN can write
-                        .requestMatchers(HttpMethod.GET, "/api/bus-stops/**").authenticated()
+                        // Bus stops: public read, only ADMIN can write
+                        .requestMatchers(HttpMethod.GET, "/api/bus-stops/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/bus-stops/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/bus-stops/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/bus-stops/**").hasRole("ADMIN")
 
-                        // Routes: anyone authenticated can read, only ADMIN can write
-                        .requestMatchers(HttpMethod.GET, "/api/routes/**").authenticated()
+                        // Routes: public read (landing page + route browser), only ADMIN can write
+                        .requestMatchers(HttpMethod.GET, "/api/routes/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/routes/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/routes/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/routes/**").hasRole("ADMIN")
 
-                        // Buses: anyone authenticated can read, ADMIN can manage
-                        .requestMatchers(HttpMethod.GET, "/api/buses/**").authenticated()
+                        // Buses: public read, ADMIN can manage
+                        .requestMatchers(HttpMethod.GET, "/api/buses/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/buses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/buses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/buses/**").hasAnyRole("DRIVER", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/buses/**").hasRole("ADMIN")
 
-                        // Schedules: anyone authenticated can read, only ADMIN can write
-                        .requestMatchers(HttpMethod.GET, "/api/schedules/**").authenticated()
+                        // Schedules: public read, only ADMIN can write
+                        .requestMatchers(HttpMethod.GET, "/api/schedules/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/schedules/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/schedules/**").hasRole("ADMIN")
 
